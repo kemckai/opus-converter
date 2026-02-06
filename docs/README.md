@@ -1,7 +1,18 @@
-# GitHub Pages Audio Library
+# Small Music Converter
 
 This folder is designed to be published with GitHub Pages using the `docs/`
 root. The page loads quickly by only fetching audio when you click Play.
+
+## Local converter (recommended)
+
+GitHub Pages does not set the security headers required by ffmpeg.wasm.
+For in-browser conversion, run the local server below in Chrome or Firefox.
+
+```bash
+node tools/serve-coop.js
+```
+
+Then open `http://localhost:8080/` and use the Opus converter.
 
 ## Steps
 
