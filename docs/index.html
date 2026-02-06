@@ -106,12 +106,27 @@
       const convertButton = document.getElementById("convert-button");
       const convertStatus = document.getElementById("convert-status");
       const downloadLink = document.getElementById("download-link");
-      const { createFFmpeg, fetchFile } = FFmpeg;
-      const ffmpeg = createFFmpeg({
-        log: false,
-        corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js",
-      });
       let ffmpegReady = false;
+      let ffmpeg = null;
+      let fetchFile = null;
+
+      convertButton.disabled = true;
+      convertStatus.textContent = "Choose a file to enable conversion.";
+
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files && fileInput.files[0]) {
+          convertButton.disabled = false;
+          convertStatus.textContent = `Selected: ${fileInput.files[0].name}`;
+        } else {
+          convertButton.disabled = true;
+          convertStatus.textContent = "Choose a file to enable conversion.";
+        }
+      });
+
+      window.addEventListener("error", (event) => {
+        const message = event && event.message ? event.message : "Unknown error";
+        convertStatus.textContent = `Converter error: ${message}`;
+      });
 
       function setSources(item) {
         player.pause();
@@ -174,17 +189,31 @@
           listEl.appendChild(pre);
         });
 
-      async function ensureFfmpegReady() {
+      function ensureFfmpegReady() {
+        if (!window.FFmpeg || typeof window.FFmpeg.createFFmpeg !== "function") {
+          convertStatus.textContent = "Converter library failed to load.";
+          throw new Error("FFmpeg library not available");
+        }
+        if (!ffmpeg) {
+          const { createFFmpeg: create, fetchFile: fetch } = window.FFmpeg;
+          fetchFile = fetch;
+          ffmpeg = create({
+            log: false,
+            corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js",
+          });
+        }
         if (ffmpegReady) return;
         convertStatus.textContent = "Loading converter...";
-        try {
-          await ffmpeg.load();
-          ffmpegReady = true;
-          convertStatus.textContent = "Converter loaded.";
-        } catch (err) {
-          convertStatus.textContent = `Converter failed to load: ${String(err)}`;
-          throw err;
-        }
+        return ffmpeg
+          .load()
+          .then(() => {
+            ffmpegReady = true;
+            convertStatus.textContent = "Converter loaded.";
+          })
+          .catch((err) => {
+            convertStatus.textContent = `Converter failed to load: ${String(err)}`;
+            throw err;
+          });
       }
 
       convertButton.addEventListener("click", async () => {
@@ -197,6 +226,12 @@
         const bitrate = Number.parseInt(bitrateInput.value, 10);
         if (!Number.isFinite(bitrate) || bitrate < 16 || bitrate > 256) {
           convertStatus.textContent = "Bitrate must be between 16 and 256.";
+          return;
+        }
+
+        if (typeof SharedArrayBuffer === "undefined") {
+          convertStatus.textContent =
+            "Your browser blocks SharedArrayBuffer. Try Chrome or Firefox.";
           return;
         }
 
