@@ -1,0 +1,16 @@
+[
+  {
+    "title": "Clip 01",
+    "sources": [
+      { "src": "audio/clip01.opus", "type": "audio/ogg; codecs=opus" },
+      { "src": "audio/clip01.m4a", "type": "audio/mp4" }
+    ]
+  },
+  {
+    "title": "Clip 02",
+    "sources": [
+      { "src": "audio/clip02.opus", "type": "audio/ogg; codecs=opus" },
+      { "src": "audio/clip02.m4a", "type": "audio/mp4" }
+    ]
+  }
+]

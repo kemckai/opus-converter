@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Small Music Converter</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      }
+      body {
+        margin: 24px;
+        max-width: 900px;
+      }
+      h1,
+      h2 {
+        margin-bottom: 8px;
+      }
+      #status {
+        font-size: 0.95rem;
+        opacity: 0.8;
+      }
+      #list {
+        margin: 20px 0 28px;
+        display: grid;
+        gap: 10px;
+      }
+      .item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid #8884;
+        border-radius: 8px;
+      }
+      .title {
+        font-weight: 600;
+      }
+      button {
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      audio {
+        width: 100%;
+      }
+      .note {
+        font-size: 0.9rem;
+        opacity: 0.75;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Small Music Converter</h1>
+
+    <h2>Opus Converter</h2>
+    <div class="item" style="grid-template-columns: 1fr;">
+      <div>
+        <label>
+          Choose audio file:
+          <input id="file-input" type="file" accept="audio/*" />
+        </label>
+      </div>
+      <div>
+        <label>
+          Bitrate (kbps):
+          <input id="bitrate" type="number" min="16" max="256" value="64" />
+        </label>
+      </div>
+      <div>
+        <label>
+          Sample rate (Hz, optional):
+          <input id="samplerate" type="number" min="8000" max="48000" placeholder="leave blank" />
+        </label>
+      </div>
+      <div>
+        <button id="convert-button" type="button">Convert to Opus</button>
+      </div>
+      <div id="convert-status" class="note">Ready to convert.</div>
+      <div>
+        <a id="download-link" href="#" download style="display: none;">Download Opus</a>
+      </div>
+    </div>
+
+    <h2>Audio Library</h2>
+    <div id="status">Loading list...</div>
+    <div id="list" role="list"></div>
+
+    <audio id="player" controls preload="none">
+      Your browser does not support the audio element.
+    </audio>
+
+    <p class="note">
+      Files are only fetched when you press Play.
+    </p>
+
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
+    <script>
+      const statusEl = document.getElementById("status");
+      const listEl = document.getElementById("list");
+      const player = document.getElementById("player");
+      const fileInput = document.getElementById("file-input");
+      const bitrateInput = document.getElementById("bitrate");
+      const sampleRateInput = document.getElementById("samplerate");
+      const convertButton = document.getElementById("convert-button");
+      const convertStatus = document.getElementById("convert-status");
+      const downloadLink = document.getElementById("download-link");
+      const { createFFmpeg, fetchFile } = FFmpeg;
+      const ffmpeg = createFFmpeg({ log: false });
+      let ffmpegReady = false;
+
+      function setSources(item) {
+        player.pause();
+        player.removeAttribute("src");
+        while (player.firstChild) {
+          player.removeChild(player.firstChild);
+        }
+
+        const sources = Array.isArray(item.sources)
+          ? item.sources
+          : [{ src: item.src, type: item.type }];
+
+        sources.forEach((source) => {
+          if (!source || !source.src) return;
+          const el = document.createElement("source");
+          el.src = source.src;
+          if (source.type) el.type = source.type;
+          player.appendChild(el);
+        });
+
+        player.load();
+      }
+
+      function addItem(item, index) {
+        const row = document.createElement("div");
+        row.className = "item";
+        row.setAttribute("role", "listitem");
+
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = item.title || `Track ${String(index + 1).padStart(2, "0")}`;
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Play";
+        button.addEventListener("click", () => {
+          setSources(item);
+          player.play();
+        });
+
+        row.appendChild(title);
+        row.appendChild(button);
+        listEl.appendChild(row);
+      }
+
+      fetch("manifest.json", { cache: "no-store" })
+        .then((res) => {
+          if (!res.ok) throw new Error("manifest.json not found");
+          return res.json();
+        })
+        .then((items) => {
+          if (!Array.isArray(items)) throw new Error("manifest.json must be an array");
+          items.forEach(addItem);
+          statusEl.textContent = `${items.length} tracks ready.`;
+        })
+        .catch((err) => {
+          statusEl.textContent = "Could not load manifest.json";
+          const pre = document.createElement("pre");
+          pre.textContent = String(err);
+          listEl.appendChild(pre);
+        });
+
+      async function ensureFfmpegReady() {
+        if (ffmpegReady) return;
+        convertStatus.textContent = "Loading converter...";
+        await ffmpeg.load();
+        ffmpegReady = true;
+        convertStatus.textContent = "Converter loaded.";
+      }
+
+      convertButton.addEventListener("click", async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+          convertStatus.textContent = "Choose a file first.";
+          return;
+        }
+
+        const bitrate = Number.parseInt(bitrateInput.value, 10);
+        if (!Number.isFinite(bitrate) || bitrate < 16 || bitrate > 256) {
+          convertStatus.textContent = "Bitrate must be between 16 and 256.";
+          return;
+        }
+
+        await ensureFfmpegReady();
+        convertStatus.textContent = "Converting...";
+        downloadLink.style.display = "none";
+
+        const inputName = "input";
+        const outputName = "output.opus";
+        const sampleRate = Number.parseInt(sampleRateInput.value, 10);
+
+        ffmpeg.FS("writeFile", inputName, await fetchFile(file));
+
+        const args = ["-i", inputName, "-c:a", "libopus", "-b:a", `${bitrate}k`];
+        if (Number.isFinite(sampleRate)) {
+          args.push("-ar", String(sampleRate));
+        }
+        args.push(outputName);
+
+        try {
+          await ffmpeg.run(...args);
+          const data = ffmpeg.FS("readFile", outputName);
+          const blob = new Blob([data.buffer], { type: "audio/ogg" });
+          const url = URL.createObjectURL(blob);
+          downloadLink.href = url;
+          downloadLink.download = file.name.replace(/\.[^/.]+$/, "") + ".opus";
+          downloadLink.style.display = "inline-block";
+          convertStatus.textContent = "Done.";
+        } catch (err) {
+          convertStatus.textContent = `Conversion failed: ${String(err)}`;
+        } finally {
+          try {
+            ffmpeg.FS("unlink", inputName);
+            ffmpeg.FS("unlink", outputName);
+          } catch (cleanupError) {
+            // Ignore cleanup errors.
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
