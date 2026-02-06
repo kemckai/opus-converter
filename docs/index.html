@@ -107,7 +107,10 @@
       const convertStatus = document.getElementById("convert-status");
       const downloadLink = document.getElementById("download-link");
       const { createFFmpeg, fetchFile } = FFmpeg;
-      const ffmpeg = createFFmpeg({ log: false });
+      const ffmpeg = createFFmpeg({
+        log: false,
+        corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js",
+      });
       let ffmpegReady = false;
 
       function setSources(item) {
@@ -174,9 +177,14 @@
       async function ensureFfmpegReady() {
         if (ffmpegReady) return;
         convertStatus.textContent = "Loading converter...";
-        await ffmpeg.load();
-        ffmpegReady = true;
-        convertStatus.textContent = "Converter loaded.";
+        try {
+          await ffmpeg.load();
+          ffmpegReady = true;
+          convertStatus.textContent = "Converter loaded.";
+        } catch (err) {
+          convertStatus.textContent = `Converter failed to load: ${String(err)}`;
+          throw err;
+        }
       }
 
       convertButton.addEventListener("click", async () => {
@@ -192,7 +200,12 @@
           return;
         }
 
-        await ensureFfmpegReady();
+        try {
+          await ensureFfmpegReady();
+        } catch (err) {
+          return;
+        }
+
         convertStatus.textContent = "Converting...";
         downloadLink.style.display = "none";
 
