@@ -1,8 +1,7 @@
-# Small Music Converter
+# GitHub Pages Audio Library
 
 This folder is designed to be published with GitHub Pages using the `docs/`
-root. The page includes an in-browser Opus converter and a fast-loading
-audio library that only fetches files when you click Play.
+root. The page loads quickly by only fetching audio when you click Play.
 
 ## Steps
 
@@ -11,11 +10,6 @@ audio library that only fetches files when you click Play.
 3. In GitHub, go to Settings → Pages.
 4. Source: Deploy from a branch. Branch: `main`. Folder: `/docs`.
 5. Save, then open the provided URL.
-
-## Converter notes
-
-- The Opus converter runs fully in the browser using ffmpeg.wasm.
-- Large files can be slow or memory-heavy depending on your device.
 
 ## Recommended formats
 
